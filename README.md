@@ -1,4 +1,5 @@
 # mruby-uri
+[![Build Status](https://travis-ci.org/Asmod4n/mruby-uri.svg)](https://travis-ci.org/Asmod4n/mruby-uri)
 
 Examples
 ========
