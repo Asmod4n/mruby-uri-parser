@@ -5,7 +5,7 @@ Examples
 ========
 
 ```ruby
-uri = URI.parse("http://user:password@domain.tld:8080/path?query=string#fragement")
+uri = URI.parse("http://user:password@domain.tld:8080/path?query=string#fragment")
 puts uri.schema
 puts uri.userinfo
 puts uri.host
