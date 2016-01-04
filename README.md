@@ -1,5 +1,5 @@
-# mruby-uri
-[![Build Status](https://travis-ci.org/Asmod4n/mruby-uri.svg)](https://travis-ci.org/Asmod4n/mruby-uri)
+# mruby-uri-parser
+[![Build Status](https://travis-ci.org/Asmod4n/mruby-uri-parser.svg)](https://travis-ci.org/Asmod4n/mruby-uri-parser)
 
 Examples
 ========
