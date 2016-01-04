@@ -580,28 +580,3 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
 
   return 0;
 }
-
-struct parsed_uri parse_uri(const char *uri_string) {
-    struct http_parser_url u;
-    http_parser_url_init(&u);
-    http_parser_parse_url(uri_string, strlen(uri_string), 0, &u);
-
-    struct parsed_uri uri = {
-        u.field_set,
-        u.field_data[0].off,
-        u.field_data[0].off + u.field_data[0].len,
-        u.field_data[6].off,
-        u.field_data[6].off + u.field_data[6].len,
-        u.field_data[1].off,
-        u.field_data[1].off + u.field_data[1].len,
-        u.port,
-        u.field_data[3].off,
-        u.field_data[3].off + u.field_data[3].len,
-        u.field_data[4].off,
-        u.field_data[4].off + u.field_data[4].len,
-        u.field_data[5].off,
-        u.field_data[5].off + u.field_data[5].len,
-    };
-
-    return uri;
-}

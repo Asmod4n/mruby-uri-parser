@@ -1,4 +1,3 @@
-#include "uri_parser.h"
 #include "mruby/uri_parser.h"
 #include "mrb_uri_parser.h"
 

@@ -1,5 +1,5 @@
-#ifndef MRUBY_URI_H
-#define MRUBY_URI_H
+#ifndef MRUBY_URI_PARSER_H
+#define MRUBY_URI_PARSER_H
 
 #include <mruby.h>
 

@@ -1,6 +1,7 @@
 #ifndef MRB_URI_PARSER_H
 #define MRB_URI_PARSER_H
 
+#include "uri_parser.h"
 #include <mruby/string.h>
 #include <errno.h>
 #include <mruby/error.h>
