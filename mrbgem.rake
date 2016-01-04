@@ -6,7 +6,6 @@
   spec.add_conflict 'mruby-uri'
 
   if (/mswin|mingw|win32/ =~ RUBY_PLATFORM) then
-    spec.linker.libraries << 'wsock32'
     spec.linker.libraries << 'ws2_32'
   end
 end
