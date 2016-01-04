@@ -477,7 +477,7 @@ http_parser_url_init(struct http_parser_url *u) {
   memset(u, 0, sizeof(*u));
 }
 
-int
+enum http_parser_url_rcs
 http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
                       struct http_parser_url *u)
 {
@@ -496,7 +496,7 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
     /* Figure out the next field that we're operating on */
     switch (s) {
       case s_dead:
-        return 1;
+        return MALFORMED_URL;
 
       /* Skip delimeters */
       case s_req_schema_slash:
@@ -552,18 +552,18 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
   /* parsing http:///toto will fail */
   if ((u->field_set & (1 << UF_SCHEMA)) &&
       (u->field_set & (1 << UF_HOST)) == 0) {
-    return 1;
+    return HOST_NOT_PRESENT;
   }
 
   if (u->field_set & (1 << UF_HOST)) {
     if (http_parse_host(buf, u, found_at) != 0) {
-      return 1;
+      return HOST_NOT_PARSEABLE;
     }
   }
 
   /* CONNECT requests can only contain "hostname:port" */
   if (is_connect && u->field_set != ((1 << UF_HOST)|(1 << UF_PORT))) {
-    return 1;
+    return CONNECT_MALFORMED;
   }
 
   if (u->field_set & (1 << UF_PORT)) {
@@ -572,11 +572,11 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
 
     /* Ports have a max value of 2^16 */
     if (v > 0xffff) {
-      return 1;
+      return PORT_TOO_LARGE;
     }
 
     u->port = (uint16_t) v;
   }
 
-  return 0;
+  return URL_OKAY;
 }
