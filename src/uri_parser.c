@@ -78,9 +78,9 @@ static const uint8_t normal_url_char[32] = {
 enum state
   { s_dead = 1 /* important that this is > 0 */
   , s_req_spaces_before_url
-  , s_req_schema
-  , s_req_schema_slash
-  , s_req_schema_slash_slash
+  , s_req_scheme
+  , s_req_scheme_slash
+  , s_req_scheme_slash_slash
   , s_req_server_start
   , s_req_server
   , s_req_server_with_at
@@ -185,30 +185,30 @@ parse_url_char(enum state s, const char ch)
       }
 
       if (IS_ALPHA(ch)) {
-        return s_req_schema;
+        return s_req_scheme;
       }
 
       break;
 
-    case s_req_schema:
+    case s_req_scheme:
       if (IS_ALPHA(ch)) {
         return s;
       }
 
       if (ch == ':') {
-        return s_req_schema_slash;
+        return s_req_scheme_slash;
       }
 
       break;
 
-    case s_req_schema_slash:
+    case s_req_scheme_slash:
       if (ch == '/') {
-        return s_req_schema_slash_slash;
+        return s_req_scheme_slash_slash;
       }
 
       break;
 
-    case s_req_schema_slash_slash:
+    case s_req_scheme_slash_slash:
       if (ch == '/') {
         return s_req_server_start;
       }
@@ -499,14 +499,14 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
         return MALFORMED_URL;
 
       /* Skip delimeters */
-      case s_req_schema_slash:
-      case s_req_schema_slash_slash:
+      case s_req_scheme_slash:
+      case s_req_scheme_slash_slash:
       case s_req_server_start:
       case s_req_query_string_start:
       case s_req_fragment_start:
         continue;
 
-      case s_req_schema:
+      case s_req_scheme:
         uf = UF_SCHEMA;
         break;
 
@@ -548,7 +548,7 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
     old_uf = uf;
   }
 
-  /* host must be present if there is a schema */
+  /* host must be present if there is a scheme */
   /* parsing http:///toto will fail */
   if ((u->field_set & (1 << UF_SCHEMA)) &&
       (u->field_set & (1 << UF_HOST)) == 0) {

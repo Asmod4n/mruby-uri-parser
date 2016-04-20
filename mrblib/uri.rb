@@ -1,12 +1,12 @@
 module URI
   class Parsed
-    attr_reader :schema, :host, :port, :path, :query, :fragment, :userinfo
+    attr_reader :scheme, :host, :port, :path, :query, :fragment, :userinfo
 
-    def initialize(schema, host, port, path, query, fragment, userinfo, uri)
-      @schema, @host, @port, @path, @query, @fragment, @userinfo, @uri = schema, host, port, path, query, fragment, userinfo, uri
+    def initialize(scheme, host, port, path, query, fragment, userinfo, uri)
+      @scheme, @host, @port, @path, @query, @fragment, @userinfo, @uri = scheme, host, port, path, query, fragment, userinfo, uri
 
       unless port
-        @port = URI.get_port(String(schema).downcase)
+        @port = URI.get_port(String(scheme).downcase)
       end
     end
 
