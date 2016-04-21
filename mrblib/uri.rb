@@ -1,6 +1,7 @@
 module URI
   class Parsed
     attr_reader :scheme, :host, :port, :path, :query, :fragment, :userinfo
+    alias :schema :scheme
 
     def initialize(scheme, host, port, path, query, fragment, userinfo, uri)
       @scheme, @host, @port, @path, @query, @fragment, @userinfo, @uri = scheme, host, port, path, query, fragment, userinfo, uri
