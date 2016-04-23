@@ -1,3 +1,7 @@
+#ifdef MRB_INT16
+#  error "mruby-uri-parser is not compatible with MRB_INT16"
+#endif
+
 #ifndef MRB_URI_PARSER_H
 #define MRB_URI_PARSER_H
 

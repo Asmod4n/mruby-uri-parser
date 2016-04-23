@@ -6,7 +6,7 @@ Examples
 
 ```ruby
 uri = URI.parse("http://user:password@domain.tld:8080/path?query=string#fragment")
-puts uri.schema
+puts uri.scheme
 puts uri.userinfo
 puts uri.host
 puts uri.port
@@ -20,7 +20,7 @@ License
 Copyright 2016 Hendrik Beskow
 
 Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
+you may not use this project except in compliance with the License.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
