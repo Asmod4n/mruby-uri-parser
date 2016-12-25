@@ -3,9 +3,7 @@
 
 #include <mruby.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+MRB_BEGIN_DECL
 
 #define E_URI_ERROR (mrb_class_get_under(mrb, mrb_module_get(mrb, "URI"), "Error"))
 #define E_URI_MALFORMED (mrb_class_get_under(mrb, mrb_module_get(mrb, "URI"), "Malformed"))
@@ -14,8 +12,6 @@ extern "C" {
 #define E_URI_CONNECT_MALFORMED (mrb_class_get_under(mrb, mrb_module_get(mrb, "URI"), "ConnectMalformed"))
 #define E_URI_PORT_TOO_LARGE (mrb_class_get_under(mrb, mrb_module_get(mrb, "URI"), "PortTooLarge"))
 
-#ifdef __cplusplus
-}
-#endif
+MRB_END_DECL
 
 #endif
