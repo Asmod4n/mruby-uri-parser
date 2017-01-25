@@ -6,8 +6,8 @@ module URI
     def initialize(schema, host, port, path, query, fragment, userinfo, uri)
       @schema, @host, @port, @path, @query, @fragment, @userinfo, @uri = schema, host, port, path, query, fragment, userinfo, uri
 
-      unless port
-        @port = URI.get_port(String(schema).downcase)
+      if port.nil? && !schema.nil?
+        @port = URI.get_port(schema.downcase)
       end
     end
 
