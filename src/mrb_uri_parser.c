@@ -16,17 +16,44 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
   enum http_parser_url_rcs rc = http_parser_parse_url(RSTRING_PTR(uri_string), RSTRING_LEN(uri_string), is_connect, &parser);
   switch (rc) {
     case URL_OKAY: {
-      mrb_value argv[UF_MAX + 1];
-      for (int curr_url_field = 0; curr_url_field < UF_MAX; curr_url_field++) {
-        if (parser.field_set & (1 << curr_url_field)) {
-          if (curr_url_field == UF_PORT) {
-            argv[curr_url_field] = mrb_fixnum_value(parser.port);
-          } else {
-            argv[curr_url_field] = mrb_str_substr(mrb, uri_string, parser.field_data[curr_url_field].off, parser.field_data[curr_url_field].len);
+      mrb_value argv[UF_MAX + 1] = {mrb_nil_value()};
+      if (parser.field_set & (1 << UF_SCHEMA)) {
+        argv[UF_SCHEMA] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_SCHEMA].off, parser.field_data[UF_SCHEMA].len);
+      }
+      if (parser.field_set & (1 << UF_HOST)) {
+        argv[UF_HOST] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_HOST].off, parser.field_data[UF_HOST].len);
+      }
+      if (parser.field_set & (1 << UF_PORT)) {
+        argv[UF_PORT] = mrb_fixnum_value(parser.port);
+      } else {
+        errno = 0;
+        mrb_value schema = argv[UF_SCHEMA]
+        if (mrb_test(schema)) {
+          mrb_value test = mrb_funcall(mrb, schema, "downcase", 0);
+          if (mrb_test(test)) {
+            schema = test;
           }
-        } else {
-          argv[curr_url_field] = mrb_nil_value();
         }
+        const char *name = mrb_string_value_cstr(mrb, &schema);
+        struct servent *answer = getservbyname(name, "tcp");
+        if (answer != NULL) {
+          argv[UF_PORT] = mrb_fixnum_value(ntohs(answer->s_port));
+        }
+        else if (errno) {
+          mrb_sys_fail(mrb, "getservbyname");
+        }
+      }
+      if (parser.field_set & (1 << UF_PATH)) {
+        argv[UF_PATH] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_PATH].off, parser.field_data[UF_PATH].len);
+      }
+      if (parser.field_set & (1 << UF_QUERY)) {
+        argv[UF_QUERY] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_QUERY].off, parser.field_data[UF_QUERY].len);
+      }
+      if (parser.field_set & (1 << UF_FRAGMENT)) {
+        argv[UF_FRAGMENT] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_FRAGMENT].off, parser.field_data[UF_FRAGMENT].len);
+      }
+      if (parser.field_set & (1 << UF_USERINFO)) {
+        argv[UF_USERINFO] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_USERINFO].off, parser.field_data[UF_USERINFO].len);
       }
       argv[UF_MAX] = uri_string;
 
