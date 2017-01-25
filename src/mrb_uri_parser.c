@@ -27,7 +27,7 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
         argv[UF_PORT] = mrb_fixnum_value(parser.port);
       } else {
         errno = 0;
-        mrb_value schema = argv[UF_SCHEMA]
+        mrb_value schema = argv[UF_SCHEMA];
         if (mrb_test(schema)) {
           mrb_value test = mrb_funcall(mrb, schema, "downcase", 0);
           if (mrb_test(test)) {
