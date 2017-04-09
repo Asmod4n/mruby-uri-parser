@@ -4,11 +4,13 @@
 
 #ifndef MRB_URI_PARSER_H
 #define MRB_URI_PARSER_H
-
+#include <stdio.h>
+#include <string.h>
 #include "uri_parser.h"
 #include <mruby/string.h>
 #include <errno.h>
 #include <mruby/error.h>
+#include <mruby/numeric.h>
 
 #ifdef _WIN32
 

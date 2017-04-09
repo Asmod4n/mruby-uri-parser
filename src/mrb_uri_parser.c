@@ -1,6 +1,14 @@
 #include "mruby/uri_parser.h"
 #include "mrb_uri_parser.h"
 
+#if (__GNUC__ >= 3) || (__INTEL_COMPILER >= 800) || defined(__clang__)
+# define likely(x) __builtin_expect(!!(x), 1)
+# define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+# define likely(x) (x)
+# define unlikely(x) (x)
+#endif
+
 #define MRB_URI_PARSED (mrb_class_get_under(mrb, mrb_module_get(mrb, "URI"), "Parsed"))
 
 static mrb_value
@@ -14,52 +22,44 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
   struct http_parser_url parser;
   http_parser_url_init(&parser);
   enum http_parser_url_rcs rc = http_parser_parse_url(RSTRING_PTR(uri_string), RSTRING_LEN(uri_string), is_connect, &parser);
-  switch (rc) {
-    case URL_OKAY: {
-      mrb_value argv[UF_MAX + 1] = {mrb_nil_value()};
-      if (parser.field_set & (1 << UF_SCHEMA)) {
-        argv[UF_SCHEMA] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_SCHEMA].off, parser.field_data[UF_SCHEMA].len);
-      }
-      if (parser.field_set & (1 << UF_HOST)) {
-        argv[UF_HOST] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_HOST].off, parser.field_data[UF_HOST].len);
-      }
-      if (parser.field_set & (1 << UF_PORT)) {
-        argv[UF_PORT] = mrb_fixnum_value(parser.port);
-      } else {
-        errno = 0;
-        mrb_value schema = argv[UF_SCHEMA];
-        if (mrb_test(schema)) {
-          mrb_value test = mrb_funcall(mrb, schema, "downcase", 0);
-          if (mrb_test(test)) {
-            schema = test;
-          }
-        }
-        const char *name = mrb_string_value_cstr(mrb, &schema);
-        struct servent *answer = getservbyname(name, "tcp");
-        if (answer != NULL) {
-          argv[UF_PORT] = mrb_fixnum_value(ntohs(answer->s_port));
-        }
-        else if (errno) {
-          mrb_sys_fail(mrb, "getservbyname");
-        }
-      }
-      if (parser.field_set & (1 << UF_PATH)) {
-        argv[UF_PATH] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_PATH].off, parser.field_data[UF_PATH].len);
-      }
-      if (parser.field_set & (1 << UF_QUERY)) {
-        argv[UF_QUERY] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_QUERY].off, parser.field_data[UF_QUERY].len);
-      }
-      if (parser.field_set & (1 << UF_FRAGMENT)) {
-        argv[UF_FRAGMENT] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_FRAGMENT].off, parser.field_data[UF_FRAGMENT].len);
-      }
-      if (parser.field_set & (1 << UF_USERINFO)) {
-        argv[UF_USERINFO] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_USERINFO].off, parser.field_data[UF_USERINFO].len);
-      }
-      argv[UF_MAX] = uri_string;
-
-      return mrb_obj_new(mrb, MRB_URI_PARSED, sizeof(argv) / sizeof(argv[0]), argv);
+  if (likely(rc == URL_OKAY)) {
+    mrb_value argv[UF_MAX + 1] = {mrb_nil_value()};
+    if (parser.field_set & (1 << UF_SCHEMA)) {
+      argv[UF_SCHEMA] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_SCHEMA].off, parser.field_data[UF_SCHEMA].len);
     }
-      break;
+    if (likely(parser.field_set & (1 << UF_HOST))) {
+      argv[UF_HOST] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_HOST].off, parser.field_data[UF_HOST].len);
+    }
+    if (parser.field_set & (1 << UF_PORT)) {
+      argv[UF_PORT] = mrb_fixnum_value(parser.port);
+    } else if (mrb_test(argv[UF_SCHEMA])) {
+      mrb_value schema = mrb_funcall(mrb, argv[UF_SCHEMA], "downcase", 0);
+      const char *name = mrb_string_value_cstr(mrb, &schema);
+      errno = 0;
+      struct servent *answer = getservbyname(name, "tcp");
+      if (likely(answer != NULL)) {
+        argv[UF_PORT] = mrb_fixnum_value(ntohs(answer->s_port));
+      } else if (errno) {
+        mrb_sys_fail(mrb, "getservbyname");
+      }
+    }
+    if (parser.field_set & (1 << UF_PATH)) {
+      argv[UF_PATH] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_PATH].off, parser.field_data[UF_PATH].len);
+    }
+    if (parser.field_set & (1 << UF_QUERY)) {
+      argv[UF_QUERY] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_QUERY].off, parser.field_data[UF_QUERY].len);
+    }
+    if (parser.field_set & (1 << UF_FRAGMENT)) {
+      argv[UF_FRAGMENT] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_FRAGMENT].off, parser.field_data[UF_FRAGMENT].len);
+    }
+    if (parser.field_set & (1 << UF_USERINFO)) {
+      argv[UF_USERINFO] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_USERINFO].off, parser.field_data[UF_USERINFO].len);
+    }
+    argv[UF_MAX] = uri_string;
+
+    return mrb_obj_new(mrb, MRB_URI_PARSED, sizeof(argv) / sizeof(argv[0]), argv);
+  }
+  else switch (rc) {
     case MALFORMED_URL:
       mrb_raise(mrb, E_URI_MALFORMED, "Malformed URL");
       break;
@@ -75,6 +75,8 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
     case PORT_TOO_LARGE:
       mrb_raise(mrb, E_URI_PORT_TOO_LARGE, "Port too large");
       break;
+    default:
+      mrb_bug(mrb, "bug inside http_parser_parse_url");
   }
 }
 
@@ -100,6 +102,80 @@ mrb_uri_parser_get_port(mrb_state *mrb, mrb_value self)
   return self;
 }
 
+// Adopted from http://stackoverflow.com/a/21491633
+
+static const char encode_rfc3986[256] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,45,46,0,48,49,50,51,52,53,54,55,56,57,0,0,0,0,0,0,0,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,0,0,0,0,95,0,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,0,0,0,126,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+static mrb_value
+mrb_url_encode(mrb_state *mrb, mrb_value self)
+{
+  char *url;
+  mrb_get_args(mrb, "z", &url);
+
+  mrb_int product;
+  if (unlikely(mrb_int_mul_overflow(strlen(url), 3, &product))) {
+    mrb_raise(mrb, E_RANGE_ERROR, "string size too big");
+  }
+
+  mrb_value url_encoded = mrb_str_new(mrb, NULL, product);
+  char *enc = RSTRING_PTR(url_encoded);
+  memset(enc, 0, RSTRING_CAPA(url_encoded));
+
+  while (*url++) {
+    if (encode_rfc3986[(unsigned char)*url]) *enc = encode_rfc3986[(unsigned char)*url];
+    else sprintf(enc, "%%%02X", *url);
+    while (*++enc);
+  }
+
+  return mrb_str_resize(mrb, url_encoded, enc - RSTRING_PTR(url_encoded));
+}
+
+// Adopted from http://stackoverflow.com/a/30895866
+
+static const char decode_rfc3986[256] = {
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+     0, 1, 2, 3, 4, 5, 6, 7,  8, 9,-1,-1,-1,-1,-1,-1,
+    -1,10,11,12,13,14,15,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,10,11,12,13,14,15,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1
+};
+
+static mrb_value
+mrb_url_decode(mrb_state *mrb, mrb_value self)
+{
+  char *encoded;
+  mrb_get_args(mrb, "z", &encoded);
+
+  mrb_value url_decoded = mrb_str_new(mrb, NULL, strlen(encoded));
+  char *dec = RSTRING_PTR(url_decoded);
+  memset(dec, 0, RSTRING_CAPA(url_decoded));
+
+  char c, v1, v2;
+
+  while((c=*encoded++)) {
+    if(c == '%') {
+      if((v1=decode_rfc3986[(unsigned char)*encoded++])<0||(v2=decode_rfc3986[(unsigned char)*encoded++])<0) {
+        return mrb_nil_value();
+      }
+      c = (v1<<4)|v2;
+    }
+    *dec++ = c;
+  }
+
+  return mrb_str_resize(mrb, url_decoded, dec - RSTRING_PTR(url_decoded));
+}
+
 void
 mrb_mruby_uri_parser_gem_init(mrb_state* mrb)
 {
@@ -121,6 +197,8 @@ mrb_mruby_uri_parser_gem_init(mrb_state* mrb)
   mrb_define_class_under(mrb, uri_mod, "PortTooLarge", uri_error_class);
   mrb_define_module_function(mrb, uri_mod, "parse", mrb_http_parser_parse_url, MRB_ARGS_ARG(1, 1));
   mrb_define_module_function(mrb, uri_mod, "get_port", mrb_uri_parser_get_port, MRB_ARGS_ARG(1, 1));
+  mrb_define_module_function(mrb, uri_mod, "encode", mrb_url_encode, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, uri_mod, "decode", mrb_url_decode, MRB_ARGS_REQ(1));
 }
 
 
