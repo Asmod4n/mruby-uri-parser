@@ -104,7 +104,24 @@ mrb_uri_parser_get_port(mrb_state *mrb, mrb_value self)
 
 // Adopted from http://stackoverflow.com/a/21491633
 
-static const char encode_rfc3986[256] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,45,46,0,48,49,50,51,52,53,54,55,56,57,0,0,0,0,0,0,0,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,0,0,0,0,95,0,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,0,0,0,126,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+static const char encode_rfc3986[256] = {
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 45, 46,  0,
+   48, 49, 50, 51, 52, 53, 54, 55, 56, 57,  0,  0,  0,  0,  0,  0,
+    0, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+   80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,  0,  0,  0,  0, 95,
+    0, 97, 98, 99,100,101,102,103,104,105,106,107,108,109,110,111,
+  112,113,114,115,116,117,118,119,120,121,122,  0,  0,  0,126,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+};
 
 static mrb_value
 mrb_url_encode(mrb_state *mrb, mrb_value self)
@@ -121,7 +138,7 @@ mrb_url_encode(mrb_state *mrb, mrb_value self)
   char *enc = RSTRING_PTR(url_encoded);
   memset(enc, 0, RSTRING_CAPA(url_encoded));
 
-  while (*url++) {
+  for (; *url; url++) {
     if (encode_rfc3986[(unsigned char)*url]) *enc = encode_rfc3986[(unsigned char)*url];
     else sprintf(enc, "%%%02X", *url);
     while (*++enc);
@@ -154,12 +171,11 @@ static const char decode_rfc3986[256] = {
 static mrb_value
 mrb_url_decode(mrb_state *mrb, mrb_value self)
 {
-  char *encoded;
-  mrb_get_args(mrb, "z", &encoded);
+  mrb_value encoded_str;
+  mrb_get_args(mrb, "S", &encoded_str);
 
-  mrb_value url_decoded = mrb_str_new(mrb, NULL, strlen(encoded));
-  char *dec = RSTRING_PTR(url_decoded);
-  memset(dec, 0, RSTRING_CAPA(url_decoded));
+  char *encoded = RSTRING_PTR(encoded_str);
+  char *decoded = RSTRING_PTR(encoded_str);
 
   char c, v1, v2;
 
@@ -170,10 +186,10 @@ mrb_url_decode(mrb_state *mrb, mrb_value self)
       }
       c = (v1<<4)|v2;
     }
-    *dec++ = c;
+    *decoded++ = c;
   }
 
-  return mrb_str_resize(mrb, url_decoded, dec - RSTRING_PTR(url_decoded));
+  return mrb_str_resize(mrb, encoded_str, decoded - RSTRING_PTR(encoded_str));
 }
 
 void
