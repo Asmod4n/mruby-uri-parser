@@ -33,12 +33,12 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
       }
       if (parser.field_set & (1 << UF_PORT)) {
         argv[UF_PORT] = mrb_fixnum_value(parser.port);
-      } else if (mrb_test(argv[UF_SCHEMA])) {
+      } else if (mrb_string_p(argv[UF_SCHEMA])) {
         mrb_value schema = mrb_funcall(mrb, argv[UF_SCHEMA], "downcase", 0);
         const char *name = mrb_string_value_cstr(mrb, &schema);
         errno = 0;
         struct servent *answer = getservbyname(name, "tcp");
-        if (likely(answer != NULL)) {
+        if (answer != NULL) {
           argv[UF_PORT] = mrb_fixnum_value(ntohs(answer->s_port));
         } else if (errno) {
           mrb_sys_fail(mrb, "getservbyname");
