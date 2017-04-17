@@ -4,6 +4,8 @@
 Examples
 ========
 
+URI Parsing
+-----------
 ```ruby
 uri = URI.parse("http://user:password@domain.tld:8080/path?query=string#fragment")
 puts uri.scheme
@@ -15,9 +17,17 @@ puts uri.query
 puts uri.fragment
 ```
 
+URI encoding/decoding
+---------------------
+```ruby
+encoded = URI.encode("http://www.test.com")
+puts encoded
+puts URI.decode(encoded)
+```
+
 License
 =======
-Copyright 2016 Hendrik Beskow
+Copyright 2016,2017 Hendrik Beskow
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this project except in compliance with the License.
