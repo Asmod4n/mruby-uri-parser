@@ -37,7 +37,7 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
         mrb_value schema = mrb_funcall(mrb, argv[UF_SCHEMA], "downcase", 0);
         const char *name = mrb_string_value_cstr(mrb, &schema);
         errno = 0;
-        struct servent *answer = getservbyname(name, "tcp");
+        struct servent *answer = getservbyname(name, NULL);
         if (answer != NULL) {
           argv[UF_PORT] = mrb_fixnum_value(ntohs(answer->s_port));
         } else if (errno) {
@@ -89,12 +89,10 @@ mrb_uri_parser_get_port(mrb_state *mrb, mrb_value self)
   struct servent *answer = getservbyname(name, proto);
   if (answer != NULL) {
     return mrb_fixnum_value(ntohs(answer->s_port));
+  } else if (errno == 0) {
+    return mrb_nil_value();
   } else {
-    if (errno == 0) {
-      return mrb_nil_value();
-    } else {
-      mrb_sys_fail(mrb, "getservbyname");
-    }
+    mrb_sys_fail(mrb, "getservbyname");
   }
 
   return self;
@@ -102,7 +100,7 @@ mrb_uri_parser_get_port(mrb_state *mrb, mrb_value self)
 
 // Adopted from http://stackoverflow.com/a/21491633
 
-static const char encode_rfc3986[256] = {
+static const unsigned char encode_rfc3986[256] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 45, 46,  0,
@@ -127,17 +125,17 @@ mrb_url_encode(mrb_state *mrb, mrb_value self)
   char *url;
   mrb_get_args(mrb, "z", &url);
 
-  mrb_int product;
-  if (unlikely(mrb_int_mul_overflow(strlen(url), 3, &product))) {
+  mrb_value encoded_len = mrb_fixnum_mul(mrb, mrb_fixnum_value(strlen(url)), mrb_fixnum_value(3));
+  if (unlikely(mrb_float_p(encoded_len))) {
     mrb_raise(mrb, E_RANGE_ERROR, "string size too big");
   }
 
-  mrb_value url_encoded = mrb_str_new(mrb, NULL, product);
+  mrb_value url_encoded = mrb_str_new(mrb, NULL, mrb_fixnum(encoded_len));
   char *enc = RSTRING_PTR(url_encoded);
   memset(enc, 0, RSTRING_CAPA(url_encoded));
 
   for (; *url; url++) {
-    if (encode_rfc3986[(unsigned char)*url]) *enc = encode_rfc3986[(unsigned char)*url];
+    if (encode_rfc3986[(unsigned char)*url]) *enc = *url;
     else sprintf(enc, "%%%02X", *url);
     while (*++enc);
   }
