@@ -35,9 +35,8 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
         argv[UF_PORT] = mrb_fixnum_value(parser.port);
       } else if (mrb_string_p(argv[UF_SCHEMA])) {
         mrb_value schema = mrb_funcall(mrb, argv[UF_SCHEMA], "downcase", 0);
-        const char *name = mrb_string_value_cstr(mrb, &schema);
         errno = 0;
-        struct servent *answer = getservbyname(name, NULL);
+        struct servent *answer = getservbyname(mrb_string_value_cstr(mrb, &schema), NULL);
         if (answer != NULL) {
           argv[UF_PORT] = mrb_fixnum_value(ntohs(answer->s_port));
         } else if (errno) {
@@ -100,7 +99,7 @@ mrb_uri_parser_get_port(mrb_state *mrb, mrb_value self)
 
 // Adopted from http://stackoverflow.com/a/21491633
 
-static const unsigned char encode_rfc3986[256] = {
+static const unsigned char encode_rfc3986[] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 45, 46,  0,
@@ -122,21 +121,22 @@ static const unsigned char encode_rfc3986[256] = {
 static mrb_value
 mrb_url_encode(mrb_state *mrb, mrb_value self)
 {
-  char *url;
-  mrb_get_args(mrb, "z", &url);
+  mrb_value url_str;
+  mrb_get_args(mrb, "S", &url_str);
 
-  mrb_value encoded_len = mrb_fixnum_mul(mrb, mrb_fixnum_value(strlen(url)), mrb_fixnum_value(3));
+  mrb_value encoded_len = mrb_fixnum_mul(mrb, mrb_fixnum_value(RSTRING_LEN(url_str)), mrb_fixnum_value(3));
   if (unlikely(mrb_float_p(encoded_len))) {
     mrb_raise(mrb, E_RANGE_ERROR, "string size too big");
   }
 
+  char *url = RSTRING_PTR(url_str);
   mrb_value url_encoded = mrb_str_new(mrb, NULL, mrb_fixnum(encoded_len));
   char *enc = RSTRING_PTR(url_encoded);
   memset(enc, 0, RSTRING_CAPA(url_encoded));
 
-  for (; *url; url++) {
-    if (encode_rfc3986[(unsigned char)*url]) *enc = *url;
-    else sprintf(enc, "%%%02X", *url);
+  for (mrb_int i = 0; i < RSTRING_LEN(url_str); i++) {
+    if (encode_rfc3986[(unsigned char)url[i]]) *enc = url[i];
+    else sprintf(enc, "%%%02X", url[i]);
     while (*++enc);
   }
 
@@ -145,7 +145,7 @@ mrb_url_encode(mrb_state *mrb, mrb_value self)
 
 // Adopted from http://stackoverflow.com/a/30895866
 
-static const char decode_rfc3986[256] = {
+static const char decode_rfc3986[] = {
     -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
     -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
     -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
@@ -176,9 +176,10 @@ mrb_url_decode(mrb_state *mrb, mrb_value self)
 
   char c, v1, v2;
 
-  while((c=*encoded++)) {
+  for(mrb_int i = 0; i < RSTRING_LEN(encoded_str); i++) {
+    c = encoded[i];
     if(c == '%') {
-      if((v1=decode_rfc3986[(unsigned char)*encoded++])<0||(v2=decode_rfc3986[(unsigned char)*encoded++])<0) {
+      if((v1=decode_rfc3986[(unsigned char)encoded[++i]])<0||(v2=decode_rfc3986[(unsigned char)encoded[++i]])<0) {
         return mrb_false_value();
       }
       c = (v1<<4)|v2;
