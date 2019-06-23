@@ -124,7 +124,7 @@ mrb_url_encode(mrb_state *mrb, mrb_value self)
   mrb_value url_str;
   mrb_get_args(mrb, "S", &url_str);
 
-  mrb_value encoded_len = mrb_fixnum_mul(mrb, mrb_fixnum_value(RSTRING_LEN(url_str)), mrb_fixnum_value(3));
+  mrb_value encoded_len = mrb_num_mul(mrb, mrb_fixnum_value(RSTRING_LEN(url_str)), mrb_fixnum_value(3));
   if (unlikely(mrb_float_p(encoded_len))) {
     mrb_raise(mrb, E_RANGE_ERROR, "string size too big");
   }
