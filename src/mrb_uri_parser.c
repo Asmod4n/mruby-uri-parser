@@ -171,6 +171,7 @@ mrb_url_decode(mrb_state *mrb, mrb_value self)
   mrb_get_args(mrb, "S", &encoded_str);
 
   char *encoded = RSTRING_PTR(encoded_str);
+  mrb_str_modify(mrb, mrb_str_ptr(encoded_str));
   mrb_value decoded_str = mrb_str_new(mrb, NULL, RSTRING_LEN(encoded_str));
   char *decoded = RSTRING_PTR(decoded_str);
 
