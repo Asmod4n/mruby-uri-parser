@@ -32,13 +32,13 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
         argv[UF_HOST] = mrb_str_substr(mrb, uri_string, parser.field_data[UF_HOST].off, parser.field_data[UF_HOST].len);
       }
       if (parser.field_set & (1 << UF_PORT)) {
-        argv[UF_PORT] = mrb_fixnum_value(parser.port);
+        argv[UF_PORT] = mrb_int_value(mrb, parser.port);
       } else if (mrb_string_p(argv[UF_SCHEMA])) {
         mrb_value schema = mrb_funcall(mrb, argv[UF_SCHEMA], "downcase", 0);
         errno = 0;
         struct servent *answer = getservbyname(mrb_string_value_cstr(mrb, &schema), NULL);
         if (answer != NULL) {
-          argv[UF_PORT] = mrb_fixnum_value(ntohs(answer->s_port));
+          argv[UF_PORT] = mrb_int_value(mrb, ntohs(answer->s_port));
         } else if (errno) {
           mrb_sys_fail(mrb, "getservbyname");
         }
@@ -87,7 +87,7 @@ mrb_uri_parser_get_port(mrb_state *mrb, mrb_value self)
   errno = 0;
   struct servent *answer = getservbyname(name, proto);
   if (answer != NULL) {
-    return mrb_fixnum_value(ntohs(answer->s_port));
+    return mrb_int_value(mrb, ntohs(answer->s_port));
   } else if (errno == 0) {
     return mrb_nil_value();
   } else {
@@ -124,23 +124,26 @@ mrb_url_encode(mrb_state *mrb, mrb_value self)
   mrb_value url_str;
   mrb_get_args(mrb, "S", &url_str);
 
-  mrb_value encoded_len = mrb_num_mul(mrb, mrb_fixnum_value(RSTRING_LEN(url_str)), mrb_fixnum_value(3));
-  if (unlikely(mrb_float_p(encoded_len))) {
+  mrb_value encoded_len = mrb_num_mul(mrb, mrb_int_value(mrb, RSTRING_LEN(url_str)), mrb_int_value(mrb, 3));
+  if (likely(mrb_integer_p(encoded_len))) {
+    char *url = RSTRING_PTR(url_str);
+    mrb_value url_encoded = mrb_str_new(mrb, NULL, mrb_integer(encoded_len));
+    char *enc = RSTRING_PTR(url_encoded);
+    memset(enc, 0, RSTRING_CAPA(url_encoded));
+
+    for (mrb_int i = 0; i < RSTRING_LEN(url_str); i++)
+    {
+      if (encode_rfc3986[(unsigned char)url[i]])
+        *enc = url[i];
+      else
+        sprintf(enc, "%%%02X", url[i]);
+      while (*++enc);
+    }
+
+    return mrb_str_resize(mrb, url_encoded, enc - RSTRING_PTR(url_encoded));
+  } else {
     mrb_raise(mrb, E_RANGE_ERROR, "string size too big");
   }
-
-  char *url = RSTRING_PTR(url_str);
-  mrb_value url_encoded = mrb_str_new(mrb, NULL, mrb_fixnum(encoded_len));
-  char *enc = RSTRING_PTR(url_encoded);
-  memset(enc, 0, RSTRING_CAPA(url_encoded));
-
-  for (mrb_int i = 0; i < RSTRING_LEN(url_str); i++) {
-    if (encode_rfc3986[(unsigned char)url[i]]) *enc = url[i];
-    else sprintf(enc, "%%%02X", url[i]);
-    while (*++enc);
-  }
-
-  return mrb_str_resize(mrb, url_encoded, enc - RSTRING_PTR(url_encoded));
 }
 
 // Adopted from http://stackoverflow.com/a/30895866
@@ -169,9 +172,9 @@ mrb_url_decode(mrb_state *mrb, mrb_value self)
 {
   mrb_value encoded_str;
   mrb_get_args(mrb, "S", &encoded_str);
+  mrb_str_modify(mrb, RSTRING(encoded_str));
 
   char *encoded = RSTRING_PTR(encoded_str);
-  mrb_str_modify(mrb, mrb_str_ptr(encoded_str));
   mrb_value decoded_str = mrb_str_new(mrb, NULL, RSTRING_LEN(encoded_str));
   char *decoded = RSTRING_PTR(decoded_str);
 
