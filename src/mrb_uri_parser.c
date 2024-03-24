@@ -123,7 +123,7 @@ mrb_url_encode(mrb_state *mrb, mrb_value self)
   mrb_get_args(mrb, "s", &url, &url_len);
 
   if (likely(url_len < MRB_INT_MAX / 3)) {
-    mrb_value url_encoded = mrb_str_new(mrb, NULL, ceil(url_len * 3));
+    mrb_value url_encoded = mrb_str_new(mrb, NULL, url_len * 3);
     char *enc = RSTRING_PTR(url_encoded);
 
     for (mrb_int i = 0; i < url_len; i++)
