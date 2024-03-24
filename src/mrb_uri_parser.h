@@ -11,7 +11,6 @@
 #include <errno.h>
 #include <mruby/error.h>
 #include <mruby/numeric.h>
-#include <math.h>
 
 #ifdef _WIN32
 
