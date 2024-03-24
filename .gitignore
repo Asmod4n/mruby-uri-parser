@@ -9,7 +9,7 @@
 /test/version_tmp/
 /tmp/
 /mruby/
-
+build_config.rb.lock
 ## Specific to RubyMotion:
 .dat*
 .repl_history

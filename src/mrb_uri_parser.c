@@ -34,9 +34,8 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
       if (parser.field_set & (1 << UF_PORT)) {
         argv[UF_PORT] = mrb_int_value(mrb, parser.port);
       } else if (mrb_string_p(argv[UF_SCHEMA])) {
-        mrb_value schema = mrb_funcall(mrb, argv[UF_SCHEMA], "downcase", 0);
         errno = 0;
-        struct servent *answer = getservbyname(mrb_string_value_cstr(mrb, &schema), NULL);
+        struct servent *answer = getservbyname(mrb_string_value_cstr(mrb, &argv[UF_SCHEMA]), NULL);
         if (answer != NULL) {
           argv[UF_PORT] = mrb_int_value(mrb, ntohs(answer->s_port));
         } else if (errno) {
@@ -75,6 +74,8 @@ mrb_http_parser_parse_url(mrb_state *mrb, mrb_value self)
       mrb_raise(mrb, E_URI_PORT_TOO_LARGE, "Port too large");
       break;
   }
+
+  return mrb_undef_value(); // can't be reached.
 }
 
 static mrb_value
@@ -99,45 +100,41 @@ mrb_uri_parser_get_port(mrb_state *mrb, mrb_value self)
 
 // Adopted from http://stackoverflow.com/a/21491633
 
-static const unsigned char encode_rfc3986[] = {
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 45, 46,  0,
-   48, 49, 50, 51, 52, 53, 54, 55, 56, 57,  0,  0,  0,  0,  0,  0,
-    0, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
-   80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,  0,  0,  0,  0, 95,
-    0, 97, 98, 99,100,101,102,103,104,105,106,107,108,109,110,111,
-  112,113,114,115,116,117,118,119,120,121,122,  0,  0,  0,126,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+static const unsigned char encode_rfc3986[256] = {
+    ['a'] = 1, ['b'] = 1, ['c'] = 1, ['d'] = 1, ['e'] = 1, ['f'] = 1, ['g'] = 1, 
+    ['h'] = 1, ['i'] = 1, ['j'] = 1, ['k'] = 1, ['l'] = 1, ['m'] = 1, ['n'] = 1, 
+    ['o'] = 1, ['p'] = 1, ['q'] = 1, ['r'] = 1, ['s'] = 1, ['t'] = 1, ['u'] = 1, 
+    ['v'] = 1, ['w'] = 1, ['x'] = 1, ['y'] = 1, ['z'] = 1, ['A'] = 1, ['B'] = 1, 
+    ['C'] = 1, ['D'] = 1, ['E'] = 1, ['F'] = 1, ['G'] = 1, ['H'] = 1, ['I'] = 1, 
+    ['J'] = 1, ['K'] = 1, ['L'] = 1, ['M'] = 1, ['N'] = 1, ['O'] = 1, ['P'] = 1, 
+    ['Q'] = 1, ['R'] = 1, ['S'] = 1, ['T'] = 1, ['U'] = 1, ['V'] = 1, ['W'] = 1, 
+    ['X'] = 1, ['Y'] = 1, ['Z'] = 1, ['0'] = 1, ['1'] = 1, ['2'] = 1, ['3'] = 1, 
+    ['4'] = 1, ['5'] = 1, ['6'] = 1, ['7'] = 1, ['8'] = 1, ['9'] = 1, ['-'] = 1, 
+    ['_'] = 1, ['.'] = 1, ['~'] = 1
 };
+
+static const char hex_chars[] = "0123456789ABCDEF";
 
 static mrb_value
 mrb_url_encode(mrb_state *mrb, mrb_value self)
 {
-  mrb_value url_str;
-  mrb_get_args(mrb, "S", &url_str);
+  char *url;
+  mrb_int url_len;
+  mrb_get_args(mrb, "s", &url, &url_len);
 
-  mrb_value encoded_len = mrb_num_mul(mrb, mrb_int_value(mrb, RSTRING_LEN(url_str)), mrb_int_value(mrb, 3));
-  if (likely(mrb_integer_p(encoded_len))) {
-    char *url = RSTRING_PTR(url_str);
-    mrb_value url_encoded = mrb_str_new(mrb, NULL, mrb_integer(encoded_len));
+  if (likely(url_len < MRB_INT_MAX / 3)) {
+    mrb_value url_encoded = mrb_str_new(mrb, NULL, ceil(url_len * 3));
     char *enc = RSTRING_PTR(url_encoded);
-    memset(enc, 0, RSTRING_CAPA(url_encoded));
 
-    for (mrb_int i = 0; i < RSTRING_LEN(url_str); i++)
+    for (mrb_int i = 0; i < url_len; i++)
     {
-      if (encode_rfc3986[(unsigned char)url[i]])
-        *enc = url[i];
-      else
-        sprintf(enc, "%%%02X", url[i]);
-      while (*++enc);
+      if (encode_rfc3986[(unsigned char)url[i]]) {
+        *enc++ = url[i];
+      } else {
+        *enc++ = '%';
+        *enc++ = hex_chars[(unsigned char) url[i] >> 4];
+        *enc++ = hex_chars[(unsigned char) url[i] & 15];
+      }
     }
 
     return mrb_str_resize(mrb, url_encoded, enc - RSTRING_PTR(url_encoded));
@@ -170,23 +167,29 @@ static const char decode_rfc3986[] = {
 static mrb_value
 mrb_url_decode(mrb_state *mrb, mrb_value self)
 {
-  mrb_value encoded_str;
-  mrb_get_args(mrb, "S", &encoded_str);
-  mrb_str_modify(mrb, RSTRING(encoded_str));
+  char *encoded;
+  mrb_int encoded_len;
+  mrb_get_args(mrb, "s", &encoded, &encoded_len);
 
-  char *encoded = RSTRING_PTR(encoded_str);
-  mrb_value decoded_str = mrb_str_new(mrb, NULL, RSTRING_LEN(encoded_str));
+  mrb_value decoded_str = mrb_str_new(mrb, NULL, encoded_len);
   char *decoded = RSTRING_PTR(decoded_str);
 
   char c, v1, v2;
 
-  for(mrb_int i = 0; i < RSTRING_LEN(encoded_str); i++) {
+  for(mrb_int i = 0; i < encoded_len; i++) {
     c = encoded[i];
     if(c == '%') {
-      if((v1=decode_rfc3986[(unsigned char)encoded[++i]])<0||(v2=decode_rfc3986[(unsigned char)encoded[++i]])<0) {
-        return mrb_false_value();
+      if(unlikely(i + 2 >= encoded_len)) { // Check if there are two more characters after '%'
+        mrb_raise(mrb, E_URI_MALFORMED, "Incomplete Percent Encoding");
       }
-      c = (v1<<4)|v2;
+      i++;
+      v1 = decode_rfc3986[(unsigned char)encoded[i]];
+      i++;
+      v2 = decode_rfc3986[(unsigned char)encoded[i]];
+      if(unlikely(v1 == -1 || v2 == -1)) {
+        mrb_raise(mrb, E_URI_MALFORMED, "Invalid Percent Encoding");
+      }
+      c = (v1 << 4) | v2;
     }
     *decoded++ = c;
   }
