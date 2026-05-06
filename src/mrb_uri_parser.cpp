@@ -48,6 +48,25 @@ enum {
   IDX_MAX           = 14
 };
 
+#ifdef _WIN32
+static void
+mrb_winsock_fail(mrb_state* mrb, const char* func, int err)
+{
+  char buf[256];
+  DWORD n = FormatMessageA(
+    FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+    NULL, (DWORD)err, 0, buf, sizeof(buf), NULL);
+  if (n == 0) {
+    mrb_raisef(mrb, E_RUNTIME_ERROR, "%s failed: WSA error %d", func, err);
+  }
+  /* FormatMessage tacks on \r\n — strip it. */
+  while (n > 0 && (buf[n - 1] == '\r' || buf[n - 1] == '\n' || buf[n - 1] == ' ')) {
+    buf[--n] = '\0';
+  }
+  mrb_raisef(mrb, E_RUNTIME_ERROR, "%s failed: %s (WSA error %d)", func, buf, err);
+}
+#endif
+
 /* ── URI.parse ──────────────────────────────────────────────────────────── */
 
 static mrb_value
