@@ -7,7 +7,7 @@ MRuby::Gem::Specification.new('mruby-uri-parser') do |spec|
   spec.add_conflict 'mruby-uri'
   spec.add_dependency 'mruby-c-ext-helpers'
 
-  msvc       = build.for_windows?
+  msvc       = spec.for_windows?
   cxx20_flag = msvc ? '/std:c++20' : '-std=c++20'
   spec.cxx.flags << cxx20_flag unless spec.cxx.flags.flatten.include?(cxx20_flag)
 
