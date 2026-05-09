@@ -11,8 +11,6 @@ MRuby::Gem::Specification.new('mruby-uri-parser') do |spec|
   cxx20_flag = msvc ? '/std:c++20' : '-std=c++20'
   spec.cxx.flags << cxx20_flag unless spec.cxx.flags.flatten.include?(cxx20_flag)
 
-  build_type = build.cc.defines.flatten.include?('MRB_DEBUG') ? 'Debug' : 'Release'
-
   ada_inc = File.join(spec.build_dir, 'include')
   lib_candidates = if msvc
     %w[lib lib64].map { |d| File.join(spec.build_dir, d, 'ada.lib') }
@@ -22,11 +20,9 @@ MRuby::Gem::Specification.new('mruby-uri-parser') do |spec|
   ada_lib = lib_candidates.find { |f| File.exist?(f) }
 
   unless ada_lib
-    warn "mruby-uri-parser: cannot find libada, building it (#{build_type})"
-
     cmake_args = [
       '-G', 'Ninja',
-      "-DCMAKE_BUILD_TYPE=#{build_type}",
+      "-DCMAKE_BUILD_TYPE=Release",
       '-DBUILD_SHARED_LIBS=OFF',
       '-DADA_TESTING=OFF',
       '-DADA_TOOLS=OFF',
