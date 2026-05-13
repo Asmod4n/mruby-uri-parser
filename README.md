@@ -87,9 +87,8 @@ URI.encode(123)    # raises TypeError
 
 ## Dependencies
 
-- [ada-url](https://github.com/ada-url/ada) — built automatically from `deps/ada` via CMake
+- [ada-url](https://github.com/ada-url/ada)
 - [mruby-c-ext-helpers](https://github.com/Asmod4n/mruby-c-ext-helpers)
-- the ninja build tool
 
 ## License
 
