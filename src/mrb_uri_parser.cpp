@@ -1,16 +1,7 @@
 #ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
-#include <winsock2.h>
-#pragma comment(lib, "ws2_32.lib")
-#else
-#include <netdb.h>
-#include <arpa/inet.h>
 #endif
 
 #include <mruby.h>
@@ -20,6 +11,7 @@
 #include <mruby/error.h>
 #include <mruby/presym.h>
 #include <mruby/variable.h>
+#include <mruby/hash.h>
 #include <mruby/branch_pred.h>
 #include <mruby/num_helpers.hpp>
 #include <ada.h>
@@ -48,24 +40,33 @@ enum {
   IDX_MAX           = 14
 };
 
-#ifdef _WIN32
 static void
-mrb_winsock_fail(mrb_state* mrb, const char* func, int err)
+register_default_ports(mrb_state* mrb, struct RClass* uri_mod)
 {
-  char buf[256];
-  DWORD n = FormatMessageA(
-    FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-    NULL, (DWORD)err, 0, buf, sizeof(buf), NULL);
-  if (n == 0) {
-    mrb_raisef(mrb, E_RUNTIME_ERROR, "%s failed: WSA error %d", func, err);
+  static const struct { const char* scheme; int port; } entries[] = {
+    { "http",   80   }, { "https",  443  },
+    { "ws",     80   }, { "wss",    443  },
+    { "ftp",    21   }, { "ftps",   990  },
+    { "sftp",   22   }, { "ssh",    22   }, { "scp",  22  },
+    { "smtp",   25   }, { "smtps",  465  },
+    { "imap",   143  }, { "imaps",  993  },
+    { "pop3",   110  }, { "pop3s",  995  },
+    { "ldap",   389  }, { "ldaps",  636  },
+    { "telnet", 23   }, { "tftp",   69   },
+    { "gopher", 70   }, { "dict",   2628 },
+    { "rtmp",   1935 }, { "rtsp",   554  },
+    { "mqtt",   1883 },
+  };
+
+  size_t n = sizeof(entries) / sizeof(entries[0]);
+  mrb_value h = mrb_hash_new_capa(mrb, (mrb_int)n);
+  for (size_t i = 0; i < n; i++) {
+    mrb_hash_set(mrb, h,
+      mrb_str_new_cstr(mrb, entries[i].scheme),
+      mrb_int_value(mrb, entries[i].port));
   }
-  /* FormatMessage tacks on \r\n — strip it. */
-  while (n > 0 && (buf[n - 1] == '\r' || buf[n - 1] == '\n' || buf[n - 1] == ' ')) {
-    buf[--n] = '\0';
-  }
-  mrb_raisef(mrb, E_RUNTIME_ERROR, "%s failed: %s (WSA error %d)", func, buf, err);
+  mrb_define_const_id(mrb, uri_mod, MRB_SYM(DEFAULT_PORTS), h);
 }
-#endif
 
 /* ── URI.parse ──────────────────────────────────────────────────────────── */
 
@@ -74,7 +75,7 @@ mrb_uri_parse(mrb_state *mrb, mrb_value klass)
 {
   mrb_value uri_str;
   mrb_get_args(mrb, "S", &uri_str);
-  const char *str = RSTRING_PTR(uri_str);
+  char *str = RSTRING_PTR(uri_str);
   mrb_int len     = RSTRING_LEN(uri_str);
 
   auto result = ada::parse(std::string_view(str, (size_t)len));
@@ -141,19 +142,18 @@ mrb_uri_parse(mrb_state *mrb, mrb_value klass)
   /* port */
   {
     if (c.port != ada::url_components::omitted) {
-      /* port digits sit between host_end+1 and pathname_start */
-      mrb_int start = (mrb_int)c.host_end + 1; /* skip ':' */
-      mrb_int plen  = (mrb_int)c.pathname_start - start;
+      mrb_int start = (mrb_int)c.host_end + 1;
+      mrb_int plen = (mrb_int)c.pathname_start - start;
       mrb_value port_str = mrb_str_substr(mrb, href, start, plen);
       argv[IDX_PORT] = mrb_str_to_integer(mrb, port_str, 10, FALSE);
       argv[IDX_PORT_EXPLICIT] = mrb_true_value();
-    } else {
+    }
+    else {
       argv[IDX_PORT_EXPLICIT] = mrb_false_value();
       if (mrb_string_p(argv[IDX_SCHEMA])) {
-        struct servent *answer = getservbyname(mrb_string_value_cstr(mrb, &argv[IDX_SCHEMA]), NULL);
-        if (answer != NULL) {
-          argv[IDX_PORT] = mrb_convert_number(mrb, ntohs(answer->s_port));
-        }
+        mrb_value ports = mrb_const_get(mrb, klass, MRB_SYM(DEFAULT_PORTS));
+        mrb_value port = mrb_hash_get(mrb, ports, argv[IDX_SCHEMA]);
+        if (!mrb_nil_p(port)) argv[IDX_PORT] = port;
       }
     }
   }
@@ -309,12 +309,6 @@ MRB_BEGIN_DECL
 void
 mrb_mruby_uri_parser_gem_init(mrb_state *mrb)
 {
-#ifdef _WIN32
-  WSADATA wsaData;
-  errno = 0;
-  if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-    mrb_sys_fail(mrb, "WSAStartup");
-#endif
 
   struct RClass *uri_mod = mrb_define_module_id(mrb, MRB_SYM(URI));
 
@@ -329,14 +323,12 @@ mrb_mruby_uri_parser_gem_init(mrb_state *mrb)
   mrb_define_module_function_id(mrb, uri_mod, MRB_SYM(parse),  mrb_uri_parse,  MRB_ARGS_REQ(1));
   mrb_define_module_function_id(mrb, uri_mod, MRB_SYM(encode), mrb_url_encode, MRB_ARGS_REQ(1));
   mrb_define_module_function_id(mrb, uri_mod, MRB_SYM(decode), mrb_url_decode, MRB_ARGS_REQ(1));
+  register_default_ports(mrb, uri_mod);
 }
 
 void
 mrb_mruby_uri_parser_gem_final(mrb_state *mrb)
 {
-#ifdef _WIN32
-  WSACleanup();
-#endif
   (void)mrb;
 }
 
