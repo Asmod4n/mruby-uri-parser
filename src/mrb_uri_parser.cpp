@@ -150,28 +150,10 @@ mrb_uri_parse(mrb_state *mrb, mrb_value klass)
     } else {
       argv[IDX_PORT_EXPLICIT] = mrb_false_value();
       if (mrb_string_p(argv[IDX_SCHEMA])) {
-      #ifdef _WIN32
-        WSASetLastError(0);
         struct servent *answer = getservbyname(mrb_string_value_cstr(mrb, &argv[IDX_SCHEMA]), NULL);
         if (answer != NULL) {
           argv[IDX_PORT] = mrb_convert_number(mrb, ntohs(answer->s_port));
-        } else {
-          int err = WSAGetLastError();
-          /* WSAHOST_NOT_FOUND / WSANO_DATA = schema simply has no default port.
-            Anything else (WSANOTINITIALISED, WSAENETDOWN, …) is a real failure. */
-          if (err != 0 && err != WSAHOST_NOT_FOUND && err != WSANO_DATA) {
-            mrb_winsock_fail(mrb, "getservbyname", err);
-          }
         }
-      #else
-        errno = 0;
-        struct servent *answer = getservbyname(mrb_string_value_cstr(mrb, &argv[IDX_SCHEMA]), NULL);
-        if (answer != NULL) {
-          argv[IDX_PORT] = mrb_convert_number(mrb, ntohs(answer->s_port));
-        } else if (errno) {
-          mrb_sys_fail(mrb, "getservbyname");
-        }
-      #endif
       }
     }
   }
