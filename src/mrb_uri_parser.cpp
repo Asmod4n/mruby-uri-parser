@@ -14,6 +14,7 @@
 #include <mruby/hash.h>
 #include <mruby/branch_pred.h>
 #include <mruby/num_helpers.hpp>
+#include <array>
 #include <ada.h>
 #include <string.h>
 #include <stdint.h>
@@ -201,20 +202,37 @@ mrb_uri_parse(mrb_state *mrb, mrb_value klass)
 
 /* ── encode / decode ─────────────────────────────────────────────────────── */
 
-static const unsigned char *
-encode_table()
-{
-  static unsigned char t[256];
-  static bool ready = false;
-  if (unlikely(!ready)) {
-    const char *u = "abcdefghijklmnopqrstuvwxyz"
-                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                    "0123456789-._~";
-    for (const char *p = u; *p; p++) t[(unsigned char)*p] = 1;
-    ready = true;
-  }
+/* RFC 3986 2.3: the unreserved set, and nothing else survives encoding.
+ *
+ * Built when this file is COMPILED, not when it is first called. The
+ * loops below run in the compiler; what reaches the binary is 256 bytes
+ * of .rodata. That removes a `ready` flag two threads could reach at
+ * once, and a branch on every call.
+ *
+ * It also states the RULE rather than a result. A written-out table is
+ * 256 hand-counted numbers in which one has to notice that 45, 46, 95
+ * and 126 are '-', '.', '_' and '~' before it says anything at all. */
+static constexpr std::array<unsigned char, 256> encode_rfc3986 = [] {
+  std::array<unsigned char, 256> t{};
+  for (unsigned char c = 'a'; c <= 'z'; c++) t[c] = 1;
+  for (unsigned char c = 'A'; c <= 'Z'; c++) t[c] = 1;
+  for (unsigned char c = '0'; c <= '9'; c++) t[c] = 1;
+  for (char c : {'-', '.', '_', '~'}) t[static_cast<unsigned char>(c)] = 1;
   return t;
-}
+}();
+
+/* Only checkable if the table really is finished before main() - which
+ * is the whole claim. The count is the set's size: 26 + 26 + 10 + 4. */
+static_assert(encode_rfc3986['a'] == 1 && encode_rfc3986['Z'] == 1);
+static_assert(encode_rfc3986['0'] == 1 && encode_rfc3986['~'] == 1);
+static_assert(encode_rfc3986[' '] == 0 && encode_rfc3986['/'] == 0);
+static_assert(encode_rfc3986['+'] == 0);  /* %2B, never a space */
+static_assert(encode_rfc3986[0xff] == 0);
+static_assert([] {
+  int n = 0;
+  for (unsigned char v : encode_rfc3986) n += v;
+  return n;
+}() == 66);
 
 static const char hex_chars[] = "0123456789ABCDEF";
 
@@ -227,12 +245,11 @@ mrb_url_encode(mrb_state *mrb, mrb_value self)
 
   if (likely(url_len < MRB_INT_MAX / 3)) {
     mrb_value url_encoded = mrb_str_new(mrb, NULL, url_len * 3);
-    const unsigned char *tbl = encode_table();
     char *enc = RSTRING_PTR(url_encoded);
 
     for (mrb_int i = 0; i < url_len; i++) {
       unsigned char ch = (unsigned char)url[i];
-      if (tbl[ch]) {
+      if (encode_rfc3986[ch]) {
         *enc++ = (char)ch;
       } else {
         *enc++ = '%';
