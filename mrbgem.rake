@@ -6,6 +6,9 @@ MRuby::Gem::Specification.new('mruby-uri-parser') do |spec|
   spec.summary = 'WHATWG-compliant URI parser for mruby (ada-url)'
   spec.add_conflict 'mruby-uri'
   spec.add_dependency 'mruby-c-ext-helpers'
+  # ada.h is this gem's own C++ face; a dependent that wants percent
+  # decoding or the query parser directly needs it too.
+  spec.export_include_paths << "#{spec.dir}/include"
 
   # A build that already asks for C++20 or later keeps its -std: the
   # last -std on the line wins, and a later one here would take away
